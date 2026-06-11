@@ -1,0 +1,15 @@
+INBreast mini-evaluation, checkpoint-10
+
+Training steps: 10
+Evaluation subset: 10 samples
+Validation timesteps: 5
+
+Sample-wise average precision: 0.8802
+Sample-wise AUROC: 0.7143
+
+Pixel-wise average precision: 0.0040
+Optimal DICE score over all thresholds: 0.0102
+
+Note:
+This is an initial sanity evaluation, not a final full-scale experiment.
+The result shows an initial image-level anomaly signal, while pixel-level localization still requires further training and tuning.
