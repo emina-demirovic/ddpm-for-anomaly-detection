@@ -1,111 +1,118 @@
-# Dataset / dataloading settings
-dataset:
-  something: 0
-dataloader_num_workers: 2
-train_batch_size: 2
+# DDPM anomaly detection configuration
 
-# Model settings: https://huggingface.co/docs/diffusers/api/models/unet2d
-unet:
-  # sample_size: 128 # resolution
-  # in_channels: 6 # 3 for noise, 3 for conditioning
-  # out_channels: 3
+dataset:
+  name: INBreast
+  datasets_dir: datasets
+  image_size: 256
+  image_channels: 1
+  center: true
+  normal_split: 0.8
+  anomal_split: 0.99
+
+dataloader:
+  num_workers: 2
+  train_batch_size: 2
+  validation_batch_size: 1
+
+model:
+  # U-Net used as the denoising network in the diffusion model.
   center_input_sample: false
-  time_embedding_type: "positional"
+  time_embedding_type: positional
   freq_shift: 0
   flip_sin_to_cos: true
-  down_block_types: [
-    "DownBlock2D", 
-    "AttnDownBlock2D", 
-    "AttnDownBlock2D", 
-    "AttnDownBlock2D"
-  ]
-  up_block_types: [
-    "UpBlock2D", 
-    "AttnUpBlock2D", 
-    "AttnUpBlock2D", 
-    "AttnUpBlock2D"
-  ]
-  block_out_channels: [
-    128,
-    256,
-    256,
-    512
-  ]
+
+  down_block_types:
+    - DownBlock2D
+    - AttnDownBlock2D
+    - AttnDownBlock2D
+    - AttnDownBlock2D
+
+  up_block_types:
+    - UpBlock2D
+    - AttnUpBlock2D
+    - AttnUpBlock2D
+    - AttnUpBlock2D
+
+  block_out_channels:
+    - 128
+    - 256
+    - 256
+    - 512
+
   layers_per_block: 2
   mid_block_scale_factor: 1
   downsample_padding: 1
-  downsample_type: "conv"
-  upsample_type: "conv"
+  downsample_type: conv
+  upsample_type: conv
   dropout: 0.0
-  act_fn: "silu"
+  act_fn: silu
   attention_head_dim: 8
   norm_num_groups: 32
-  attn_norm_num_groups: null
   norm_eps: 1e-05
-  resnet_time_scale_shift: "default"
+  resnet_time_scale_shift: default
   class_embed_type: null
 
-# Task settings
-task_kwargs:
+diffusion:
+  prediction_type: epsilon
+  noise_offset: 0.1
+  input_perturbation: 0.0
+  validation_timesteps: 5
+  validation_guidance: 0.0
+
+restoration_tasks:
+  # Task ids used during training:
+  # 2 = sink deformation
+  # 3 = source deformation
+  # 4 = intensity change
+  train_task_ids:
+    - 2
+    - 3
+    - 4
+
   intensity_task_scale: 0.1
   min_push_dist: 0.5
-  max_push_dist: 5
+  max_push_dist: 5.0
   use_noise_task: true
-  other_dset_size_cap: 150
   use_threshold: 0.225
+  p_no_aug: 0.0
 
-# General settings
-uncond_p: 0.
-noise_offset: 0.1
-input_perturbation: 0.0
-max_train_steps: 10 
+training:
+  max_train_steps: 10
+  gradient_accumulation_steps: 1
+  gradient_checkpointing: false
+  mixed_precision: fp16
+  allow_tf32: true
+  use_ema: true
+  resume_from_checkpoint: latest
+  seed: 42
 
-gradient_accumulation_steps: 1
-gradient_checkpointing: false
+optimizer:
+  learning_rate: 1e-4
+  scale_lr: false
+  lr_scheduler: constant
+  lr_warmup_steps: 500
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_weight_decay: 1e-2
+  adam_epsilon: 1e-08
+  max_grad_norm: 1.0
+  use_8bit_adam: false
+  snr_gamma: 1.0
 
-use_ema: true
-resume_from_checkpoint: latest
-seed: 42
+evaluation:
+  mini_eval_size: 10
+  balanced_mini_eval: true
+  validation_samples: 1
+  compute_pixel_metrics: true
+  compute_sample_metrics: true
 
-# optimizer
-learning_rate: 1e-4
-scale_lr: false
-lr_scheduler: constant
-lr_warmup_steps: 500
+checkpointing:
+  output_dir: experiments/inbreast_debug
+  checkpointing_steps: 5
+  checkpoints_total_limit: 2
 
-adam_beta1: 0.9
-adam_beta2: 0.999
-adam_weight_decay: 1e-2
-adam_epsilon: 1e-08
-max_grad_norm: 1.0
-prediction_type: epsilon
-use_8bit_adam: false
-snr_gamma: 1.0
-
-# Optimizations
-allow_tf32: true
-mixed_precision: "fp16"
-enable_xformers_memory_efficient_attention: false # does not work
-
-# logging
-report_to: null 
-tracker_project_name: hf-video-diffusion # wandb project name
-group: cond_generation # for wandb, will group runs per experiment name
-
-# checkpointing
-output_dir: experiments/inbreast_debug
-logging_dir: logs # unused ?
-checkpointing_steps: 5
-checkpoints_total_limit: 2
-
-# Validation settings
-validation_samples: 1
-validation_batch_size: 1
-validation_timesteps: 5
-validation_guidance: 0.
-validation_img_steps: 5000
-validation_loss_steps: 500
-validation_patience: 50000
-validation_loss_ma_alpha: 0.9
-validation_monitoring_start: 5000
-
+results:
+  results_dir: results
+  save_anomaly_maps: true
+  save_scores: true
+  save_visualizations: true
