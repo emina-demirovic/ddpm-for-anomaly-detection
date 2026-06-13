@@ -1,0 +1,510 @@
+\documentclass[10pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{amssymb}
+\usepackage{float}
+
+\hypersetup{
+	colorlinks=true,
+	linkcolor=black,
+	citecolor=black,
+	urlcolor=blue
+}
+
+\title{
+	\textbf{\Large Difuzioni modeli sa verovatnosnim uklanjanjem šuma}\\
+	\textbf{\large Denoising Diffusion Probabilistic Models (DDPM)}\\[0.03cm]
+	\Large Primena u detekciji anomalija u mamografskim slikama\\[0.35cm]
+}
+
+\author{
+	\begin{minipage}[t]{0.44\textwidth}
+		\centering
+		\textbf{Prof. dr Nikša Jakovljević}\\
+		Departman za energetiku, \\
+		elektroniku i telekomunikacije\\
+		Fakultet tehničkih nauka,\\
+		Univerzitet u Novom Sadu\\
+		Novi Sad, Srbija\\
+		\texttt{jakovnik@uns.ac.rs}
+	\end{minipage}
+	\hfill
+	\begin{minipage}[t]{0.44\textwidth}
+		\centering
+		\textbf{Emina Demirović}\\
+		Departman za računarstvo\\
+		i automatiku\\
+		Fakultet tehničkih nauka,\\
+		Univerzitet u Novom Sadu\\
+		Novi Sad, Srbija\\
+		\texttt{demirovic@uns.ac.rs}
+	\end{minipage}
+}
+
+\date{}
+
+\begin{document}
+	
+	\pagenumbering{gobble}
+	\maketitle
+	\pagestyle{empty}
+	
+	\begin{center}
+		\begin{minipage}{0.92\textwidth}
+			\textbf{Sažetak --}
+			U okviru projekta razvijen je zaokružen eksperimentalni pipeline koji povezuje pripremu medicinskih slika, rekonstrukcioni model zasnovan na difuziji, postupak formiranja anomalijskih mapa i evaluaciju dobijenih rezultata.
+			U ovom radu prikazana je realizacija sistema za detekciju anomalija u mamografskim slikama primenom rekonstrukcionog pristupa zasnovanog na difuzionim modelima. Polazna ideja je da se pomoću modela difuzije generiše rekonstrukcija koja odgovara zdravom obrascu tkiva, a da se anomalijska mapa formira na osnovu razlike između originalne i rekonstruisane slike. Realizovano rešenje pokazuje da rekonstrukciona greška difuzionog modela može poslužiti kao osnova za formiranje anomalijskog signala u mamografskim slikama. Dobijeni rezultati potvrđuju funkcionalnost implementiranog pipeline-a i predstavljaju osnovu za dalja unapređenja kroz duži trening, širu evaluaciju i dodatno podešavanje modela. Projekat se tumači kao tehnički zaokružena demonstracija pristupa, a ne kao klinički validirano rešenje za preciznu lokalizaciju lezija.
+			
+			\vspace{0.3cm}
+			
+			\textbf{Ključne reči --}
+			difuzioni modeli, DDPM, anomalijska detekcija, mamografske slike, medicinska obrada slike, šum, zašumljavanje, rekonstrukcija, mapa anomalija
+			
+		\end{minipage}
+	\end{center}
+	
+	\vspace{0.4cm}
+	
+	\section{Uvod}
+	Mamografske slike imaju važnu ulogu u ranom otkrivanju patoloških promena u tkivu dojke, ali njihova automatska analiza predstavlja složen zadatak. Promene koje su od interesa često zauzimaju mali deo slike, mogu imati slab kontrast u odnosu na okolno tkivo i javljaju se u anatomskom kontekstu koji značajno varira od pacijenta do pacijenta. Zbog toga detekcija anomalija u mamografskim slikama nije samo problem prepoznavanja da li je slika sumnjiva, već i problem dobijanja prostorne informacije o tome gde se mogu nalaziti regioni koji odstupaju od očekivanog zdravog obrasca.
+	
+	Klasični diskriminativni pristupi ovaj problem najčešće posmatraju kao zadatak klasifikacije ili segmentacije. U klasifikacionoj postavci model uči da slici dodeli odgovarajuću oznaku, ali takav izlaz sam po sebi ne objašnjava koji deo slike je doveo do odluke. Sa druge strane, segmentacioni pristupi zahtevaju precizne anotacije na nivou piksela, koje su u medicinskom domenu često skupe, vremenski zahtevne i zavisne od stručne interpretacije. Zbog toga su rekonstrukcioni pristupi posebno zanimljivi za anomalijsku detekciju, jer pokušavaju da iskoriste razliku između originalne slike i njene rekonstrukcije kao signal prisustva nepravilnosti.
+	
+	Osnovna ideja rekonstrukcione anomalijske detekcije jeste da se model nauči da dobro predstavlja normalne, odnosno zdrave obrasce u podacima. Ako se takav model primeni na sliku koja sadrži patološku promenu, očekuje se da će zdravi delovi slike biti rekonstruisani stabilnije, dok će regioni koji odstupaju od naučene distribucije dovesti do veće rekonstrukcione greške. Na osnovu te greške može se formirati anomalijska mapa, koja predstavlja prostorni prikaz intenziteta odstupanja između originalne i rekonstruisane slike.
+	
+	U ovom projektu razmatra se primena difuzionih modela u takvoj rekonstrukcionoj postavci. Difuzioni modeli su generativni modeli koji u toku unapred postepeno dodaju šum ulaznim podacima, dok se u obrnutom toku uči proces uklanjanja šuma i rekonstrukcije uzorka. Za potrebe anomalijske detekcije, cilj nije samo generisanje vizuelno uverljive slike, već dobijanje rekonstrukcije koja zadržava relevantnu anatomsku strukturu, a istovremeno potiskuje sadržaj koji odgovara anomaliji. Razlika između originalne slike i takve rekonstrukcije koristi se kao osnova za formiranje anomalijskog odgovora.
+	
+	Realizovani projekat obuhvata kompletan eksperimentalni tok rada, od pripreme medicinskih slika i provere validnosti pripremljenog skupa, preko definisanja prilagođenog PyTorch dataset loader-a, do konfiguracije eksperimenta, treninga, evaluacije i analize početnih rezultata. Poseban akcenat stavljen je na to da realizacija bude tehnički čista, ponovljiva i pogodna za odbranu projekta. Zbog ograničenog GPU vremena, rad se ne posmatra kao završeno kliničko rešenje, već kao implementacija i demonstracija diffusion-based pipeline-a za rekonstrukcionu detekciju anomalija u mamografskim slikama.
+	
+	Cilj rada je da se prikaže kako se model difuzije može prilagoditi medicinskim slikama i upotrebiti za formiranje anomalijskih mapa na osnovu rekonstrukcione greške. 
+	
+	\section{Teorijska osnova}
+	
+	\subsection{Osnovni princip difuzionih modela}
+	
+	Difuzioni modeli predstavljaju klasu generativnih modela koji uče distribuciju podataka kroz postupak postepenog dodavanja i uklanjanja šuma. Za razliku od diskriminativnih modela, čiji je osnovni cilj donošenje odluke o klasi uzorka, generativni modeli nastoje da nauče strukturu podataka i način na koji se realistični uzorci mogu dobiti iz jednostavne početne raspodele.
+	
+	Osnovna ideja difuzionog modela može se posmatrati kroz dva procesa. Prvi je forward proces, u kome se originalni uzorak postepeno degradira dodavanjem Gausovog šuma. Nakon dovoljno velikog broja koraka, slika gubi gotovo sve informacije o početnom sadržaju i približava se standardnoj normalnoj raspodeli. Drugi je reverse proces, u kome se model uči da ide u suprotnom smeru: od zašumljenog uzorka ka podatku koji pripada originalnoj distribuciji.
+	
+	U kontekstu slika, ovaj pristup znači da se složen problem generisanja slike ne rešava jednim direktnim preslikavanjem, već nizom jednostavnijih lokalnih denoising koraka. Model ne mora odmah da generiše kompletnu sliku, već u svakom koraku uči kako da ukloni deo šuma i time postepeno dođe do realističnog uzorka. Upravo ova osobina čini difuzione modele pogodnim za rekonstrukcione zadatke, jer omogućavaju kontrolisano kretanje između originalne slike, zašumljenog stanja i rekonstruisanog izlaza.
+	
+	\subsection{Forward proces}
+	
+	Neka je $x_0$ originalna slika iz skupa podataka. Forward proces definiše način na koji se od originalne slike dobija niz sve zašumljenijih uzoraka $x_1, x_2, \ldots, x_T$. U svakom koraku dodaje se mala količina Gausovog šuma, pri čemu se proces može zapisati kao Markovljev lanac:
+	
+	\begin{equation}
+		q(x_t|x_{t-1}) =
+		\mathcal{N}(x_t; \sqrt{1-\beta_t}x_{t-1}, \beta_t I),
+	\end{equation}
+	
+	gde $\beta_t$ označava varijansu šuma u koraku $t$, a $I$ jediničnu matricu. Parametar $\beta_t$ određuje koliko se šuma dodaje u konkretnom koraku. Ako je $\beta_t$ mali, uzorak se menja postepeno, što omogućava da se degradacija slike razloži na veliki broj jednostavnih koraka.
+	
+	Uvođenjem oznaka
+	
+	\begin{equation}
+		\alpha_t = 1 - \beta_t,
+	\end{equation}
+	
+	i
+	
+	\begin{equation}
+		\bar{\alpha}_t = \prod_{i=1}^{t} \alpha_i.
+	\end{equation}
+	
+	moguće je dobiti zatvorenu formu za direktno uzorkovanje $x_t$ iz originalnog uzorka $x_0$:
+	
+	\begin{equation}
+		q(x_t|x_0) =
+		\mathcal{N}(x_t; \sqrt{\bar{\alpha}_t}x_0, (1-\bar{\alpha}_t)I).
+	\end{equation}
+	
+	Praktičan značaj ove jednačine je u tome što nije potrebno eksplicitno prolaziti kroz sve prethodne korake da bi se dobila zašumljena verzija slike u koraku $t$. Umesto toga, moguće je direktno izračunati $x_t$ na osnovu $x_0$, izabranog vremenskog koraka i uzorkovanog šuma $\epsilon$:
+	
+	\begin{equation}
+		x_t = \sqrt{\bar{\alpha}_t}x_0 +
+		\sqrt{1-\bar{\alpha}_t}\epsilon,
+		\quad \epsilon \sim \mathcal{N}(0,I).
+	\end{equation}
+	
+	Ova formulacija je posebno važna tokom treninga, jer omogućava da se za svaku sliku nasumično izabere difuzioni korak, doda odgovarajući nivo šuma, te trenira mreža da predvidi dodatu komponentu šuma.
+	
+	\subsection{Reverse proces}
+	
+	Reverse proces predstavlja naučeni deo difuzionog modela. Dok je forward proces unapred definisan i ne sadrži parametre koji se uče, reverse proces treba da aproksimira prelaz iz zašumljenog stanja $x_t$ u manje zašumljeno stanje $x_{t-1}$. Cilj je da se modelom aproksimira raspodela:
+	
+	\begin{equation}
+		p_\theta(x_{t-1}|x_t),
+	\end{equation}
+	
+	gde $\theta$ označava parametre neuronske mreže.
+	
+	Direktno određivanje stvarnog inverznog procesa nije moguće, jer bi zahtevalo poznavanje nepoznate raspodele podataka. Zbog toga se uči neuronski model koji aproksimira reverse korake. \newline U DDPM pristupu reverse raspodela se najčešće modeluje kao Gausova raspodela:
+	
+	\begin{equation}
+		p_\theta(x_{t-1}|x_t) =
+		\mathcal{N}(x_{t-1}; \mu_\theta(x_t,t), \Sigma_\theta(x_t,t)).
+	\end{equation} \newline
+	
+	U ovoj formulaciji mreža uči parametre raspodele, pre svega srednju vrednost, koja određuje smer denoising koraka. Varijansa opisuje količinu preostale nesigurnosti u datom koraku. \newline Intuitivno, model u svakom koraku procenjuje kako treba korigovati trenutni zašumljeni uzorak da bi se približio realističnoj slici.
+	
+	\subsection{Parametrizacija modela i trening cilj}
+	
+	U praksi mreža najčešće ne predviđa direktno čistu sliku, već šum koji je dodat originalnom uzorku. Za dati zašumljeni uzorak $x_t$ i vremenski korak $t$, model predviđa šum:
+	
+	\begin{equation}
+		\epsilon_\theta(x_t,t).
+	\end{equation} 
+	
+	Pošto je tokom treninga poznat stvarni šum $\epsilon$ koji je dodat slici, trening cilj može se formulisati kao minimizacija srednjekvadratne greške između stvarnog i predviđenog šuma:
+	
+	\begin{equation}
+		\mathcal{L}_{\mathrm{simple}}(\theta)
+		=
+		\mathbb{E}_{x_0,\, t,\, \varepsilon \sim \mathcal{N}(0,I)}
+		\left[
+		\left\|
+		\varepsilon -
+		\varepsilon_{\theta}(x_t,t)
+		\right\|_2^2
+		\right].
+	\end{equation} \newline
+	
+	Ovakva formulacija je praktična jer složen problem učenja raspodele podataka svodi na zadatak predikcije šuma. Tokom treninga model vidi različite slike, različite nivoe šuma i različite vremenske korake, pa postepeno uči kako izgleda denoising u različitim fazama procesa.
+	
+	Iako se teorijski cilj difuzionih modela može izvesti kroz varijacionu donju granicu, odnosno ELBO funkciju, u praktičnoj implementaciji trening se često svodi upravo na ovaj jednostavniji MSE cilj. Time se dobija stabilan postupak učenja, a naučena mreža se kasnije koristi za iterativno uklanjanje šuma tokom generisanja ili rekonstrukcije.
+	
+	\subsection{Rekonstrukciona detekcija anomalija}
+	
+	U rekonstrukcionoj detekciji anomalija generativni model se koristi za dobijanje rekonstrukcije ulaznog uzorka koja odgovara naučenoj distribuciji normalnih podataka. Osnovna pretpostavka je da model bolje rekonstruiše obrasce koji su dobro zastupljeni tokom treninga, dok se regioni koji odstupaju od te distribucije rekonstruišu manje pouzdano. Razlika između originalne slike i njene rekonstrukcije zato može poslužiti kao anomalijski signal.
+	
+	Neka je $x$ ulazna slika, a $\hat{x}$ njena rekonstrukcija. Cilj je da rekonstrukcija očuva osnovnu anatomsku strukturu i normalne karakteristike ulaza, dok se sadržaj koji odstupa od naučenih zdravih obrazaca ne reprodukuje sa istom preciznošću. U tom smislu, rekonstruisana slika može se tumačiti kao približna zdrava referentna verzija ulaza, odnosno kao prikaz očekivanog izgleda slike u skladu sa distribucijom normalnih podataka.
+	
+	Način na koji se rekonstrukcija uslovljava zavisi od konkretne metode. Moguće je koristiti klasifikacioni signal, direktno uslovljavanje ulaznom slikom, trening nad sintetički oštećenim zdravim uzorcima ili kombinaciju više mehanizama. Zajednički cilj ovih pristupa jeste da model nauči da obnovi normalnu strukturu slike, a da regioni koji ne pripadaju naučenoj distribuciji dovedu do izraženije rekonstrukcione greške.
+	
+	Poseban izazov predstavlja očuvanje ravnoteže između vernosti rekonstrukcije i uklanjanja anomalijskog sadržaja. Ako rekonstrukcija previše prati ulaznu sliku, patološki region može ostati očuvan i razlika između ulaza i izlaza biće mala. Sa druge strane, ako model previše menja sadržaj slike, rekonstrukciona greška može postati velika i u anatomskim regionima koji nisu anomalijski. Zbog toga kvalitet anomalijske mape direktno zavisi od sposobnosti modela da sačuva normalnu anatomiju i istovremeno drugačije obradi regione koji odstupaju od naučenih obrazaca.
+	
+	Konkretan način uslovljavanja i rekonstrukcije korišćen u realizovanom sistemu detaljno je opisan u praktičnom delu rada.
+	
+	\subsection{Formiranje anomaly mape}
+	
+	Nakon dobijanja rekonstrukcije, anomalijska mapa se formira poređenjem originalne slike i rekonstruisanog izlaza. Neka je $x$ originalna slika, a $\hat{x}$ njena healthy-guided rekonstrukcija. Osnovna anomaly mapa može se definisati kao apsolutna razlika:
+	
+	\begin{equation}
+		A(x) = |x - \hat{x}|.
+	\end{equation}
+	
+	Visoke vrednosti u ovoj mapi ukazuju na regione u kojima se original i rekonstrukcija najviše razlikuju. U idealnom slučaju, takvi regioni odgovaraju patološkim promenama, jer model uspeva da očuva normalnu anatomiju, dok anomalijski sadržaj biva slabije rekonstruisan ili potisnut.
+	
+	U praksi anomaly mapa može zahtevati dodatnu obradu, koja može uključivati normalizaciju vrednosti, blago zaglađivanje, izdvajanje regiona od interesa i pragovanje. Cilj postprocesiranja nije da zameni model, već da stabilizuje anomalijski odgovor i smanji uticaj šuma ili intenzitetskih promena koje nisu povezane sa lezijom.
+	
+	Evaluacija anomalijske mape može se vršiti kvantitativno i kvalitativno. Kvantitativno se mapa poredi sa dostupnim binarnim maskama lezija, dok se kvalitativno analiziraju originalna slika, rekonstrukcija i mapa anomalije. Na taj način se proverava ne samo numerički rezultat, već i to da li rekonstrukcija zaista ima smisla u odnosu na vizuelni sadržaj slike.
+	
+	\section{Realizacija projekta}
+	
+	\subsection{Skup podataka i anotacije}
+	
+	Za razvoj i evaluaciju sistema korišćen je INBreast skup mamografskih snimaka, koji sadrži digitalne mamografije sa pratećim informacijama o patološkim promenama \cite{moreira2012inbreast}. Izvorne slike dostupne su u DICOM i ROI formatu, dok su anotacije promena prvobitno obezbeđene odvojeno od samih slikovnih podataka. Za potrebe realizovanog pipeline-a korišćene su DICOM slike i prethodno formirane binarne segmentacione maske masa.
+	
+	Postavka zadatka definisana je u odnosu na prisustvo mase. Slike za koje postoji odgovarajuća segmentaciona maska svrstane su u klasu \textit{mass}. Preostale slike predstavljaju referentnu klasu bez označene mase i u projektnoj strukturi označene su nazivom \textit{healthy}. Ove oznake treba tumačiti u okviru konkretnog zadatka detekcije masa: naziv \textit{healthy} označava odsustvo anotirane mase, a ne nužno potpunu kliničku potvrdu odsustva svih mogućih promena.
+	
+	Binarne maske definišu prostorni položaj anotirane mase. Vrednost jedan odgovara pikselima koji pripadaju označenoj promeni, dok vrednost nula predstavlja pozadinu. Maske nisu korišćene kao direktna supervizija tokom treninga difuzionog modela. Njihova uloga je ograničena na evaluaciju, gde omogućavaju poređenje dobijene anomalijske mape sa stvarnim položajem anotirane promene.
+	
+	Nakon pripreme dobijeno je ukupno 410 slika. Od toga je 107 slika imalo odgovarajuću masku mase, dok su 303 slike pripadale referentnoj klasi bez anotirane mase. Referentne slike podeljene su na 243 slike namenjene daljoj podeli na trening i validaciju i 60 slika izdvojenih za testiranje. Sve 107 slike iz klase \textit{mass} sa pripadajućim maskama korišćene su u test delu skupa.
+	
+	Ovakva organizacija odgovara rekonstrukcionoj anomalijskoj detekciji. Model tokom treninga uči karakteristike referentnih slika, dok se tokom evaluacije ispituje njegovo ponašanje i nad slikama koje sadrže anotiranu masu. Na taj način segmentacione maske ostaju nezavisne od procesa učenja i koriste se isključivo za objektivno vrednovanje prostornog anomalijskog odgovora.
+	
+	\subsection{Priprema i organizacija podataka}
+	
+	Pre korišćenja u treningu i evaluaciji, izvorni medicinski podaci prevedeni su u uniforman format prilagođen implementiranom pipeline-u. Za tu namenu razvijena je skripta \texttt{$prepare\_dataset.py$}, koja obrađuje DICOM snimke, povezuje ih sa dostupnim segmentacionim maskama i formira konačnu strukturu skupa podataka.
+	
+	Skripta očekuje da se izvorne mamografske slike nalaze u folderu \texttt{AllDICOMs}, dok se prethodno pripremljene maske masa nalaze u folderu \texttt{extras/MassSegmentationMasks}. Identifikator pojedinačnog slučaja izdvaja se iz naziva DICOM fajla i na osnovu njega se proverava da li za posmatranu sliku postoji odgovarajuća maska. Slike sa pronađenom maskom svrstavaju se u klasu \textit{mass}, dok se preostale slike u okviru projektne postavke tretiraju kao referentni, odnosno \textit{healthy} primeri.
+	
+	DICOM fajlovi učitavaju se pomoću biblioteke \texttt{pydicom}. Iz svakog fajla izdvaja se matrica intenziteta piksela, koja se zatim prevodi u realni numerički format. Kada je fotometrijska interpretacija slike označena kao \texttt{MONOCHROME1}, intenziteti se invertuju, jer kod ovog načina zapisa niže vrednosti odgovaraju svetlijim regionima. Na taj način obezbeđuje se dosledan odnos svetlih i tamnih oblasti u pripremljenim slikama.
+	
+	Nakon toga se sprovodi \textbf{min-max normalizacija} pojedinačne slike: od svih vrednosti oduzima se minimalni intenzitet, a rezultat se, ukoliko maksimalna vrednost nije jednaka nuli, deli novom maksimalnom vrednošću. Normalizovani intenziteti preslikavaju se u opseg od 0 do 255 i čuvaju kao osmobitne vrednosti. Slika se zatim konvertuje u jednokanalni grayscale format i njena rezolucija se menja na (256 $\times$ 256) piksela. Za promenu veličine slika koristi se Lanczos interpolacija.
+	
+	Segmentacione maske učitavaju se iz PNG fajlova. Ukoliko maska sadrži više kanala, zadržava se prvi kanal, nakon čega se sve vrednosti veće od nule preslikavaju na 255, a preostale na nulu, čime se dobija binarna maska. Maske se takođe skaliraju na rezoluciju (256 $\times$ 256) piksela, ali se za njih koristi interpolacija najbližeg suseda. Ovaj izbor sprečava nastanak novih intenzitetskih vrednosti i čuva diskretnu prirodu anotacije.
+	
+	Referentne slike se pre podele nasumično permutuju pomoću unapred zadatog semena. Deo njih izdvaja se za testiranje, dok se preostale slike koriste za kasnije formiranje trening i validacionog skupa. Udeo referentnih test slika zadaje se argumentom \texttt{test\_healthy\_ratio}, čija je podrazumevana vrednost 0.2. Fiksiranje semena omogućava da se pri ponovljenom pokretanju skripte dobije ista podela podataka.
+	
+	Sve slike sa odgovarajućom maskom smeštaju se u test skup. Na taj način anomalijski primeri nisu uključeni u podatke korišćene za učenje modela. Za svaki takav primer u odvojenom folderu čuva se prostorno usklađena binarna maska. \newline
+	
+	Konačna organizacija pripremljenog skupa obuhvata sledeće direktorijume:
+	\begin{itemize}
+		\item \texttt{train/healthy} -- referentne slike namenjene treningu i validaciji modela;
+		\item \texttt{test/healthy} -- referentne slike izdvojene za testiranje;
+		\item \texttt{test/mass} -- test slike sa anotiranom masom;
+		\item \texttt{test/masks} -- binarne segmentacione maske koje odgovaraju slikama iz foldera \texttt{test/mass}.
+	\end{itemize}
+	
+	Ovakva organizacija direktno odgovara rekonstrukcionoj postavci anomalijske detekcije, u kojoj se model uči na referentnim slikama, a zatim vrednuje i na referentnim i na anomalijskim primerima.
+	
+	Putanje do izvornog i izlaznog foldera, ciljna rezolucija, odnos podele, slučajno seme i opcija prepisivanja postojećeg skupa prosleđuju se skripti kao argumenti komandne linije. Time je postupak pripreme odvojen od konkretne lokalne putanje i može se ponoviti u drugom radnom okruženju bez izmene izvornog koda. 
+	\newpage
+	
+	\subsection{Arhitektura i tok rada sistema}
+	
+	Realizovani sistem zasnovan je na difuzionom modelu uslovljenom slikom (\textit{image-conditioned DDPM}). Za razliku od standardnog bezuslovnog generativnog modela, koji rekonstrukciju formira samo na osnovu trenutnog zašumljenog uzorka, korišćeni model u svakom koraku dobija i dodatnu uslovnu sliku, pa se na taj način proces uklanjanja šuma usmerava sadržajem konkretnog ulaznog snimka.
+	
+	Celokupan tok rada može se podeliti na četiri povezane celine: pripremu i učitavanje podataka, formiranje trening parova, učenje uslovljenog difuzionog modela i rekonstrukcionu evaluaciju. Model se tokom treninga uči isključivo na referentnim slikama bez anotirane mase, odnosno, od svake referentne slike formira se ciljna slika i njena sintetički izmenjena verzija koja služi kao uslov. Cilj modela je da na osnovu izmenjenog ulaza rekonstruiše odgovarajući originalni obrazac.
+	
+	Neka je $x_0$ originalna referentna slika, a $c$ njena sintetički izmenjena verzija. Forward difuzioni proces primenjuje se na ciljnu sliku $x_0$, čime se za slučajno izabrani vremenski korak dobija zašumljena slika $x_t$. Uslovna slika $c$ ne prolazi kroz isti difuzioni proces, već se direktno prosleđuje mreži kao dodatna informacija.
+	
+	Ulaz u denoising mrežu formira se konkatenacijom zašumljene ciljne slike i uslovne slike po dimenziji kanala:
+	
+	\begin{equation}
+		z_t = \operatorname{concat}(x_t,c).
+	\end{equation}
+	
+	Za jednokanalne mamografske slike, $x_t$ i $c$ imaju po jedan kanal, pa ulaz u mrežu ima ukupno dva kanala. Izlaz mreže ima jedan kanal i predstavlja procenu šuma koji je dodat ciljnoj slici. Kao denoising mreža koristi se U-Net arhitektura, dok je dodavanje šuma i izvođenje reverse koraka realizovano pomoću DDPM raspoređivača. \newline
+	
+	U-Net je konvolutivna arhitektura organizovana u obliku enkodersko-dekoderske strukture. Enkoderski deo postepeno smanjuje prostornu rezoluciju i izdvaja karakteristike na različitim nivoima apstrakcije, dok dekoderski deo povećava rezoluciju i formira izlaz iste prostorne veličine kao ulazna slika. Veze preskakanja (\textit{skip connections}) povezuju odgovarajuće nivoe enkodera i dekodera, čime se informacije o finim lokalnim detaljima kombinuju sa karakteristikama višeg nivoa. Ova osobina je posebno važna kod mamografskih slika, jer denoising postupak treba istovremeno da očuva anatomsku strukturu i obradi male lokalne promene. U difuzionom modelu U-Net dodatno prima informaciju o trenutnom vremenskom koraku, pa predikciju šuma prilagođava nivou degradacije ulaznog uzorka.
+	
+	
+	Tok treninga može se predstaviti na sledeći način:
+	
+	\begin{equation}
+		x_0
+		\longrightarrow
+		c
+		\longrightarrow
+		x_t
+		\longrightarrow
+		[x_t,c]
+		\longrightarrow
+		\varepsilon_{\theta}(x_t,c,t),
+	\end{equation}
+	
+	gde se $c$ dobija sintetičkom izmenom originalne slike, $x_t$ predstavlja zašumljenu ciljnu sliku, a $\varepsilon_{\theta}$ šum koji predviđa U-Net. Funkcija gubitka poredi predviđeni šum sa stvarnim šumom korišćenim u forward procesu. Na taj način model uči kako da, uz informaciju sadržanu u uslovnoj slici, postepeno rekonstruiše obrazac koji pripada distribuciji referentnih slika.
+	
+	Tokom evaluacije nisu potrebne sintetičke izmene. Test slika $x$ direktno se koristi kao uslovna slika. Proces rekonstrukcije započinje uzorkom slučajnog Gausovog šuma, koji se zatim iterativno obrađuje kroz reverse difuzione korake. U svakom koraku U-Net dobija trenutno stanje rekonstrukcije i originalnu test sliku kao uslov:
+	
+	\begin{equation}
+		[x_t,x]
+		\longrightarrow
+		\varepsilon_{\theta}(x_t,x,t)
+		\longrightarrow
+		x_{t-1}.
+	\end{equation}
+	
+	Nakon završetka reverse procesa dobija se rekonstrukcija $\hat{x}$. Pošto je model učen na referentnim slikama i zadatku obnavljanja normalne strukture, očekuje se da će obrasci slični trening podacima biti stabilnije rekonstruisani, dok regioni koji odstupaju od naučene distribucije mogu dovesti do veće razlike između ulaza i rekonstrukcije.
+	
+	Anomalijska mapa formira se na osnovu apsolutne razlike između test slike i dobijene rekonstrukcije:
+	
+	\begin{equation}
+		A(x)=|x-\hat{x}|.
+	\end{equation}
+	
+	Skalarni anomalijski skor dobija se agregacijom vrednosti anomalijske mape, dok se za prostornu evaluaciju cela mapa poredi sa odgovarajućom binarnom maskom. Maske nisu deo ulaza u model i ne utiču na proces treninga ili rekonstrukcije, već se koriste isključivo za vrednovanje dobijenog anomalijskog odgovora.
+	
+	Ovakva arhitektura ne koristi zaseban klasifikator niti klasifikaciono usmeravanje reverse procesa. Uslovljavanje se ostvaruje direktno ulaznom slikom, čime model dobija informaciju o anatomskom sadržaju koji treba očuvati tokom rekonstrukcije.
+	
+	\subsection{Formiranje trening uzoraka i postupak učenja}
+	
+	Za trening su korišćene isključivo referentne slike bez anotirane mase. One su podeljene na trening i validacioni deo, dok su svi primeri sa masom zadržani za evaluaciju. Na taj način model tokom učenja nema pristup stvarnim patološkim promenama.
+	
+	Iz svake referentne slike formira se trening par koji čine originalna slika i njena sintetički izmenjena verzija. U korišćenoj konfiguraciji primenjene su lokalne deformacije tipa \textit{sink} i \textit{source}, kao i promene intenziteta. Ove transformacije uvode lokalna odstupanja u inače zdravu sliku, dok original ostaje cilj koji model treba da rekonstruiše. Njihova svrha nije imitacija konkretne lezije, već učenje obnavljanja normalne strukture na osnovu okolnog anatomskog sadržaja.
+	
+	Tokom svakog koraka treninga originalnoj slici dodaje se šum koji odgovara nasumično izabranom difuzionom koraku. Sintetički izmenjena slika koristi se kao uslov, a U-Net procenjuje šum dodat ciljnoj slici. Parametri modela ažuriraju se na osnovu razlike između stvarnog i predviđenog šuma.
+	
+	U realizovanoj konfiguraciji korišćena je srednjekvadratna greška ponderisana odnosom signala i šuma:
+	
+	$$
+	\mathcal{L}(\theta) = 
+	\mathbb{E}
+	\left[
+	w_t
+	\left|
+	\varepsilon-
+	\varepsilon_{\theta}(x_t,c,t)
+	\right|_2^2
+	\right].
+	$$ \newline
+	
+	Ponder $w_t$ određuje doprinos pojedinačnog difuzionog koraka ukupnoj funkciji gubitka, čime se sprečava da koraci sa izrazito visokim odnosom signala i šuma imaju nesrazmerno veliki uticaj na optimizaciju.
+	
+	Nakon izračunavanja funkcije gubitka $\mathcal{L}(\theta)$ sprovode se propagacija greške unazad i ažuriranje parametara $\theta$. Model na taj način uči vezu između sintetički izmenjene uslovne slike $c$, trenutnog zašumljenog stanja ciljne slike $x_t$ i šuma $\varepsilon$ koji treba proceniti.
+	
+	Rezultat treninga nije neposredno preslikavanje sintetički izmenjene slike $c$ u originalnu sliku $x_0$. Umesto toga, model uči uslovljeni reverse difuzioni proces koji kroz niz uzastopnih koraka uklanjanja šuma generiše rekonstrukciju u skladu sa sadržajem uslovne slike i distribucijom referentnih podataka.
+	
+	Ovako postavljen trening omogućava modelu da nauči rekonstrukciju referentne slike iz uslovnog ulaza koji sadrži lokalno izmenjene regione. Ista naučena sposobnost kasnije se koristi pri obradi test slika, kada veće odstupanje između ulaza i rekonstrukcije može ukazati na prisustvo anomalije.
+	
+	\subsection{Evaluacioni postupak}
+	
+	Evaluacija sistema sprovedena je na test skupu koji obuhvata referentne slike i slike sa anotiranom masom. Za svaki primer model generiše rekonstrukciju, anomalijsku mapu i skalarni anomalijski skor. Na taj način ponašanje sistema vrednuje se na nivou cele slike i na nivou pojedinačnih piksela.
+	
+	Evaluacija na nivou slike zasniva se na skalarnom skoru dobijenom agregacijom vrednosti anomalijske mape. Slike bez anotirane mase označene su kao referentni primeri, dok slike sa masom predstavljaju anomalijsku klasu. Za procenu razdvajanja ove dve grupe korišćene su površina ispod ROC krive (\textit{AUROC}) i prosečna preciznost (\textit{average precision}). AUROC meri sposobnost modela da anomalijskim primerima dodeli više skorove od referentnih, dok je prosečna preciznost posebno korisna kada odnos klasa nije uravnotežen.
+	
+	Evaluacija na nivou piksela sprovodi se poređenjem anomalijske mape sa odgovarajućom binarnom segmentacionom maskom. Za ovaj nivo analize korišćena je prosečna preciznost, koja procenjuje rangiranje piksela prema intenzitetu anomalijskog odgovora. Pored toga, anomalijska mapa se proverava za više vrednosti praga, a za svaku dobijenu binarnu mapu izračunava se Dice koeficijent:
+	
+	$$
+	\operatorname{Dice}
+	=
+	\frac{2TP}{2TP+FP+FN},
+	$$
+	
+	gde $TP$ (True Positive) označava broj ispravno detektovanih piksela lezije, $FP$ (False Positive) broj piksela pogrešno označenih kao anomalijski, a $FN$ (False Negative) broj propuštenih piksela lezije. Kao rezultat se prijavljuje najveća ostvarena vrednost Dice koeficijenta u ispitanom skupu pragova, kao potencijal anomalijske mape pri naknadnom izboru praga, a ne performansu unapred fiksiranog klasifikacionog praga.
+	
+	Pored numeričkih metrika, sprovedena je i kvalitativna analiza. Za odabrane primere upoređuju se originalna slika, generisana rekonstrukcija, anomalijska mapa i dostupna segmentaciona maska. Ovakav prikaz omogućava da se proveri da li su veće rekonstrukcione razlike prostorno povezane sa anotiranom promenom ili nastaju i u drugim regionima, kao što su ivice dojke i oblasti izraženih intenzitetskih prelaza.
+	
+	Kombinovanjem evaluacije na nivou slike, evaluacije na nivou piksela i vizuelne analize dobija se potpuniji uvid u ponašanje sistema. Visok skor na nivou slike ne mora nužno da podrazumeva preciznu lokalizaciju, zbog čega je važno odvojeno razmatrati sposobnost detekcije prisustva anomalije i sposobnost određivanja njenog prostornog položaja.
+	
+	\section{Eksperimentalna postavka}
+	
+	\subsection{Računarsko okruženje i osnovna konfiguracija}
+	
+	Trening i evaluacija modela izvršeni su u Google Colab okruženju korišćenjem NVIDIA T4 grafičkog procesora. Lokalno okruženje korišćeno je za pripremu podataka, razvoj pomoćnih skripti i organizaciju projekta, dok su računarski zahtevni delovi eksperimenta pokretani na GPU-u.
+	
+	Implementacija je zasnovana na biblioteci PyTorch, dok su komponente difuzionog modela i raspoređivača preuzete iz biblioteke Diffusers. Za upravljanje GPU izvršavanjem, mešovitom preciznošću i čuvanjem stanja treninga korišćena je biblioteka Accelerate.
+	
+	Sve slike obrađivane su u jednokanalnom formatu, rezolucije $256 \times 256$ piksela. Veličina trening mini-skupa iznosila je dva uzorka, dok je tokom validacije obrađivan po jedan uzorak. Trening je izvršavan u režimu mešovite preciznosti \texttt{fp16}, čime je smanjena potrošnja GPU memorije i ubrzano izvršavanje.
+	
+	Zbog ograničenog raspoloživog GPU vremena korišćena je redukovana eksperimentalna konfiguracija sa ukupno deset koraka optimizacije. Stanje modela čuvano je nakon petog i desetog koraka, a za evaluaciju je korišćen završni checkpoint. Tokom treninga održavana je i eksponencijalna pokretna sredina parametara modela, koja omogućava stabilniju verziju naučenih težina.
+	
+	Ovakva postavka nije izabrana sa ciljem potpunog iskorišćavanja kapaciteta modela, već da bi se u raspoloživim uslovima proverio kompletan tok rada: učitavanje i transformacija podataka, trening uslovljenog difuzionog modela, čuvanje checkpoint-a, ponovno učitavanje modela i generisanje rezultata za evaluaciju.
+	
+	\subsection{Eksplorativni trening na redukovanom skupu}
+	
+	Pored glavne redukovane konfiguracije, sproveden je i eksplorativni trening sa većim brojem koraka optimizacije na veoma malom podskupu od približno pet slika. Cilj ovog eksperimenta bio je da se proveri ponašanje modela kada mu se omogući duže prilagođavanje istim primerima, bez računarskog troška koji bi zahtevao trening na celom skupu podataka.
+	
+	U ovoj postavci trening je produžen na približno 100 koraka. Dobijene rekonstrukcije bile su vizuelno stabilnije i pokazivale su da model pri dužem treningu uspešnije usvaja strukturu ulaznih slika. Eksperiment je potvrdio da implementirani tok može da se koristi i u zahtevnijoj konfiguraciji, ali rezultati nisu uključeni u glavnu kvantitativnu evaluaciju zbog veoma malog broja korišćenih uzoraka.
+	
+	Nastavak ovog eksperimenta na kompletnom trening skupu zahtevao bi znatno više GPU vremena. Zbog raspoloživih računarskih ograničenja, pilot postavka korišćena je kao kvalitativna potvrda ponašanja modela, dok su glavni prijavljeni rezultati dobijeni u kraćoj i ponovljivoj konfiguraciji.
+	
+	\subsection{Tok treninga i čuvanje modela}
+	
+	Pre početka treninga provereno je da se pripremljeni podaci pravilno učitavaju, da slike i maske imaju očekivane dimenzije i da model može da obradi formirani dvokanalni ulaz. Nakon uspešnog lokalnog testiranja, kompletan trening pokrenut je u Colab okruženju sa GPU podrškom. U svakom koraku formiran je mini-skup referentnih slika, nad kojima su generisane sintetičke izmene opisane u prethodnom poglavlju. Nakon izračunavanja gubitka sprovedeno je ažuriranje parametara modela, dok je biblioteka Accelerate korišćena za upravljanje mešovitom preciznošću i stanjem treninga.
+	
+	Stanja modela dobijena u glavnoj i eksplorativnoj konfiguraciji sačuvana su u odgovarajućim checkpoint direktorijumima, a dodatno su eksportovana i u serijalizovanom \texttt{.pkl} formatu. Na taj način model se može ponovo učitati bez ponavljanja treninga i koristiti kao osnova za izdvajanje komponente i njenu kasniju integraciju u API ili grafički korisnički interfejs.  
+	
+	Zbog veličine fajlova, kontrolne tačke i eksportovani modeli nisu uključeni u javni repozitorijum. Svakako, završni checkpoint je uspešno ponovo učitan i korišćen za generisanje rekonstrukcija i sprovođenje evaluacije.
+	
+	\subsection{Podešavanje evaluacije}
+	
+	Evaluacija je sprovedena nakon ponovnog učitavanja završnog checkpoint-a. Za svaki test primer generisani su rekonstrukcija, anomalijska mapa i skalarni anomalijski skor, nakon čega su izračunate metrike na nivou slike i na nivou piksela.
+	
+	Pošto iterativna rekonstrukcija difuzionim modelom zahteva značajno vreme, evaluacija je najpre sprovedena na manjem podskupu od deset slika. Početni podskup sadržao je sedam slika sa masom i tri referentne slike, dok je zatim formirana balansirana varijanta sa po pet primera iz obe klase. Time je omogućena brža provera kompletnog evaluacionog toka i realnije poređenje skorova između referentnih i anomalijskih primera.
+	
+	Broj koraka korišćenih pri generisanju rekonstrukcije smanjen je na pet, čime je vreme obrade pojedinačne slike značajno skraćeno. Dodatni guidance mehanizam nije bio aktivan, pa je rekonstrukcija uslovljena isključivo ulaznom slikom, u skladu sa prethodno opisanom image-conditioned arhitekturom.
+	
+	Tokom evaluacije čuvani su anomalijske mape, skalarni skorovi, oznake klasa i odabrane vizualizacije. Ovi izlazi korišćeni su za izračunavanje kvantitativnih metrika i naknadnu kvalitativnu analizu odnosa između originalne slike, rekonstrukcije, anomalijskog odgovora i dostupne segmentacione maske.
+	
+	\section{Rezultati i diskusija}
+	
+	\subsection{Kvantitativni rezultati}
+	
+	Nakon uspešnog učitavanja završnog checkpoint-a sprovedena je evaluacija modela nad dva manja test podskupa. Početni evaluacioni podskup sadržao je deset slika, od kojih je sedam pripadalo klasi \textit{mass}, a tri referentnoj klasi. Radi dodatne provere ponašanja metrika formiran je i balansirani podskup sa pet slika iz svake klase.
+	
+	Za svaki test primer generisani su rekonstrukcija, anomalijska mapa i skalarni anomalijski skor. Rezultati na nivou slike procenjeni su pomoću AUROC metrike i prosečne preciznosti, dok su za vrednovanje prostorne lokalizacije korišćene prosečna preciznost na nivou piksela i najveća vrednost Dice koeficijenta ostvarena u ispitanom skupu pragova.
+	
+	Kvantitativni rezultati prikazani su u tabeli ispod.
+	
+	\begin{table}[ht]
+		\centering
+		\begin{tabular}{lcc}
+			\hline \\
+			\textbf{Metrics} & \textbf{Initial} & \textbf{Balanced} \\
+			\\ \hline
+			Sample-wise average precision & 0.8802 & 0.7993 \\
+			Sample-wise AUROC & 0.7143 & 0.7025 \\
+			\hline
+		\end{tabular}
+	\end{table}
+	
+	U početnoj evaluaciji ostvarena je prosečna preciznost od $0.8802$ i AUROC od $0.7143$ na nivou slike. Ove vrednosti pokazuju da skalarni skor dobijen iz anomalijske mape sadrži informaciju relevantnu za razlikovanje slika sa masom od referentnih primera. Posebno je važno posmatrati AUROC, jer ova metrika procenjuje rangiranje primera nezavisno od konkretnog klasifikacionog praga.
+	
+	Visoka vrednost prosečne preciznosti mora se tumačiti uzimajući u obzir da početni podskup sadrži veći broj pozitivnih primera. Zbog toga balansirana evaluacija predstavlja dodatnu proveru ponašanja modela pri jednakom odnosu klasa. Njena svrha nije da zameni početni rezultat, već da omogući realnije poređenje anomalijskih skorova između referentnih i anomalijskih slika.
+	
+	Rezultati na nivou piksela znatno su niži i pokazuju da rekonstrukciona razlika nije dovoljno precizno ograničena na oblast anotirane mase. Model može slici sa masom dodeliti povišen ukupan anomalijski skor, a da se istovremeno pojačan odziv pojavljuje i van same lezije.
+	
+	Ovakva razlika između rezultata na nivou slike i na nivou piksela ima metodološko opravdanje. Skalarni skor agregira rekonstrukcionu grešku sa cele slike, pa za njegovo povećanje nije neophodno da anomalijski odgovor precizno prati granice mase. Nasuprot tome, pixel-wise metrike zahtevaju prostorno poklapanje anomalijske mape i segmentacione maske, zbog čega su znatno osetljivije na difuzne odgovore, greške rekonstrukcije i aktivacije uz anatomske granice.
+	
+	Dobijene vrednosti treba posmatrati kao početne rezultate redukovane eksperimentalne postavke. Evaluacioni podskup je mali, pa pojedinačni primer može primetno uticati na metrike. Uprkos tome, rezultati potvrđuju da je moguće dobiti merljiv anomalijski signal i sprovesti evaluaciju na nivou slike i na nivou piksela kroz kompletan implementirani tok.
+	
+	\subsection{Kvalitativna analiza rekonstrukcija i anomalijskih mapa}
+	
+	Kvantitativne metrike dopunjene su vizuelnom analizom originalnih slika, generisanih rekonstrukcija, anomalijskih mapa i odgovarajućih segmentacionih maski. Na taj način moguće je ispitati ne samo veličinu anomalijskog skora, već i prostornu raspodelu rekonstrukcione razlike.
+	
+	U većem broju analiziranih primera rekonstrukcija zadržava osnovni oblik dojke i dominantne anatomske strukture. To pokazuje da uslovljavanje ulaznom slikom omogućava modelu da generisani rezultat poveže sa konkretnim test primerom, umesto da formira nezavistan uzorak iz naučene distribucije.
+	
+	Anomalijske mape u pojedinim slučajevima pokazuju pojačan odziv u oblasti anotirane mase. Takvi primeri podržavaju osnovnu pretpostavku metode: regioni koji odstupaju od obrazaca zastupljenih u referentnim podacima mogu proizvesti veću razliku između ulazne slike i rekonstrukcije.
+	
+	Ipak, pojačane vrednosti nisu ograničene isključivo na oblast lezije. Rekonstrukciona greška često se javlja uz ivice dojke, u oblastima izraženih intenzitetskih prelaza i u delovima slike sa složenijom lokalnom teksturom. Model u tim regionima može promeniti intenzitet ili blago izmeniti strukturu iako ne postoji anotirana masa, što dovodi do lažno pozitivnog anomalijskog odgovora.
+	
+	Vizuelni rezultati takođe pokazuju značajan uticaj izabranog praga. Niži prag zadržava veći deo potencijalnog anomalijskog signala, ali istovremeno uključuje veliki broj piksela van lezije. Viši prag smanjuje broj lažno pozitivnih regiona, ali može ukloniti i slabiji signal koji pripada samoj masi. Zbog toga izbor jednog univerzalnog praga predstavlja dodatni izazov, naročito kada se veličina, kontrast i položaj lezija razlikuju između slika.
+	
+	Ovi nalazi potvrđuju da anomalijska mapa ne treba da se tumači kao gotova segmentaciona maska. Ona predstavlja mapu rekonstrukcionog odstupanja, čiji se prostorni odgovor može poklapati sa lezijom, ali istovremeno zavisi i od ukupnog kvaliteta rekonstrukcije. 
+	
+	Kvalitativni rezultati eksplorativnog treninga na tri test primera se nalaze na slikama ispod. Za svaki primer prikazani su originalna slika, rekonstrukcija, anomalijska mapa, referentna maska i binarne predikcije dobijene primenom pragova $0.10$, $0.20$ i $0.30$.
+	
+	\begin{figure}[H]
+		\centering
+		
+		\includegraphics[width=\textwidth]
+		{figures/1.jpg}
+		
+		\vspace{0.4cm}
+		
+		\includegraphics[width=\textwidth]
+		{figures/2.jpg}
+		
+		\vspace{0.4cm}
+		
+		\includegraphics[width=\textwidth]
+		{figures/3.jpg}
+		
+		\label{fig:pilot_results}
+	\end{figure}
+	
+	\subsection{Eksplorativni trening na redukovanom skupu}
+	
+	Pored glavne konfiguracije sproveden je i eksplorativni trening sa približno $100$ koraka optimizacije na veoma malom podskupu od oko pet slika. Cilj ovog eksperimenta bio je da se ispita ponašanje modela kada mu se omogući duže prilagođavanje ograničenom broju uzoraka.
+	
+	U dostupnim primerima rekonstrukcije su pokazale stabilnije očuvanje globalne anatomske strukture u odnosu na veoma kratku debug konfiguraciju. Dobijene anomalijske mape omogućile su jasniju analizu odnosa između rekonstrukcione razlike, položaja mase i odgovora koji se javlja u drugim delovima slike.
+	
+	Eksperiment je potvrdio da implementirani trening i evaluacioni tok mogu da se izvršavaju i sa većim brojem optimizacionih koraka. Međutim, rezultati ovog eksperimenta nisu uključeni u glavnu kvantitativnu tabelu. Mali broj trening primera omogućava modelu da se snažno prilagodi konkretnim slikama, pa takav rezultat nije dovoljan za procenu generalizacije na širem skupu.
+	
+	Proširenje ove konfiguracije na kompletan trening skup zahtevalo bi znatno više GPU vremena. Zbog toga je eksplorativni eksperiment korišćen kao kvalitativna potvrda ponašanja sistema i kao pokazatelj pravca u kome bi se rezultati mogli dalje unapređivati.
+	
+	\subsection{Diskusija}
+	
+	Glavni rezultat projekta predstavlja uspešna realizacija kompletnog pipeline-a za anomalijsku detekciju zasnovanu na uslovljenom difuzionom modelu. Sistem obuhvata pripremu i proveru podataka, formiranje sintetički izmenjenih trening uzoraka, učenje image-conditioned DDPM modela, čuvanje i ponovno učitavanje njegovog stanja, generisanje rekonstrukcija, formiranje anomalijskih mapa i njihovu kvantitativnu i kvalitativnu evaluaciju.
+	
+	Rezultati na nivou slike pokazuju da rekonstrukciona greška sadrži signal koji može biti koristan za razlikovanje referentnih slika i slika sa masom. Istovremeno, rezultati na nivou piksela ukazuju da taj signal još nije dovoljno precizno lokalizovan. Ova dva nalaza nisu međusobno kontradiktorna: model može prepoznati da test slika odstupa od referentne distribucije, a da pritom ne izdvoji tačne granice regiona koji je doveo do odstupanja.
+	
+	Kvalitet anomalijske mape neposredno zavisi od kvaliteta rekonstrukcije. Svaka promena normalne anatomije između ulaza i rekonstrukcije povećava anomalijski odgovor, bez obzira na to da li se u tom regionu nalazi masa. Zbog toga se posebno izražen odziv javlja u oblastima u kojima je rekonstrukcija zahtevnija, kao što su granice dojke i regije sa naglim promenama intenziteta.
+	
+	Kratak trening glavne konfiguracije predstavlja najvažnije ograničenje sprovedenog eksperimenta. Model sa deset koraka optimizacije ne može u potpunosti naučiti složenu distribuciju mamografskih slika. Pored toga, evaluacija nad deset primera omogućava proveru toka rada i početnu analizu, ali nije dovoljna za statistički pouzdanu procenu generalizacije.
+	
+	Uprkos tome, dobijeni rezultati nisu samo tehnička potvrda da se kod može izvršiti. Ostvaren je merljiv signal na nivou slike, formirane su prostorne anomalijske mape i identifikovani su konkretni izvori greške koji ograničavaju lokalizaciju. Eksplorativni trening dodatno pokazuje da duže učenje utiče na stabilnost rekonstrukcije i opravdava nastavak eksperimenata u okruženju sa većim računarskim kapacitetima.
+	
+	Za dalji razvoj bilo bi potrebno sprovesti duži trening na kompletnom referentnom skupu, evaluaciju nad većim brojem primera i sistematično ispitivanje parametara modela i procesa rekonstrukcije. Korisno bi bilo i poređenje sa jednostavnijim rekonstrukcionim metodama, kako bi se preciznije odredilo u kojoj meri difuzioni model unapređuje anomalijski signal u odnosu na manje zahtevne pristupe.
+	
+	Dobijene rezultate zato ne treba tumačiti kao završeno rešenje za preciznu segmentaciju ili kliničku dijagnostiku. Oni predstavljaju početnu eksperimentalnu validaciju metodološki i tehnički zaokruženog sistema, kao i osnovu za dalji razvoj diffusion-based pristupa anomalijskoj detekciji u mamografskim slikama.
+	
+	\section*{Reference}
+	
+	\begin{enumerate}
+		\item J. Ho, A. Jain, and P. Abbeel, ``Denoising Diffusion Probabilistic Models,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, 2020.
+		
+		\item A. Q. Nichol and P. Dhariwal, ``Improved Denoising Diffusion Probabilistic Models,'' in \textit{Proceedings of the 38th International Conference on Machine Learning (ICML)}, vol. 139, pp. 8162--8171, 2021.
+		
+		\item J. Song, C. Meng, and S. Ermon, ``Denoising Diffusion Implicit Models,'' \textit{arXiv preprint arXiv:2010.02502}, 2020.
+		
+		\item J. Wolleb, F. Bieder, R. Sandkuehler, and P. C. Cattin, ``Diffusion Models for Medical Anomaly Detection,'' \textit{arXiv preprint arXiv:2203.04306}, 2022.
+		
+		\item I. C. Moreira, I. Amaral, I. Domingues, A. Cardoso, M. J. Cardoso, and J. S. Cardoso, ``INbreast: Toward a Full-Field Digital Mammographic Database,'' \textit{Academic Radiology}, vol. 19, no. 2, pp. 236--248, 2012.
+		
+		\item C. M. Bishop and H. Bishop, \textit{Deep Learning: Foundations and Concepts}. Springer, 2024.
+		
+	\end{enumerate}
+	
+\end{document}
