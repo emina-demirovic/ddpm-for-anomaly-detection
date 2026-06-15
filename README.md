@@ -124,6 +124,17 @@ The script performs the following steps:
 
 ---
 
+### Dataset Access
+
+The INBreast dataset is not distributed with this repository. Access to the original mammography images and annotations should be requested directly from the dataset authors or the institution responsible for its distribution.
+
+After obtaining authorized access, users should provide the dataset through a local path or upload it to their own execution environment. No direct download link or copy of the dataset is included in this project.
+
+When using the dataset, please cite:  
+I. C. Moreira, I. Amaral, I. Domingues, A. Cardoso, M. J. Cardoso and J. S. Cardoso, “INbreast: Toward a Full-Field Digital Mammographic Database,” *Academic Radiology*, vol. 19, no. 2, pp. 236–248, 2012.
+
+--- 
+
 ## Dataset Validation
 
 After preprocessing, the prepared dataset can be checked with:

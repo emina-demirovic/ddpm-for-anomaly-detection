@@ -201,7 +201,9 @@
 	
 	\subsection{Skup podataka i anotacije}
 	
-	Za razvoj i evaluaciju sistema korišćen je INBreast skup mamografskih snimaka, koji sadrži digitalne mamografije sa pratećim informacijama o patološkim promenama \cite{moreira2012inbreast}. Izvorne slike dostupne su u DICOM i ROI formatu, dok su anotacije promena prvobitno obezbeđene odvojeno od samih slikovnih podataka. Za potrebe realizovanog pipeline-a korišćene su DICOM slike i prethodno formirane binarne segmentacione maske masa.
+	Za razvoj i evaluaciju sistema korišćen je INBreast skup mamografskih snimaka, koji sadrži digitalne mamografije sa pratećim informacijama o patološkim promenama [moreira2012inbreast]. Izvorne slike dostupne su u DICOM i ROI formatu, dok su anotacije promena prvobitno obezbeđene odvojeno od samih slikovnih podataka. Za potrebe realizovanog pipeline-a korišćene su DICOM slike i prethodno formirane binarne segmentacione maske masa. 
+	
+	INBreast skup nije uključen u javni repozitorijum niti se kroz projekat distribuira direktna putanja za njegovo preuzimanje. Pristup izvornim slikama i anotacijama potrebno je zatražiti od autora skupa, uz odgovarajuće navođenje originalne publikacije.
 	
 	Postavka zadatka definisana je u odnosu na prisustvo mase. Slike za koje postoji odgovarajuća segmentaciona maska svrstane su u klasu \textit{mass}. Preostale slike predstavljaju referentnu klasu bez označene mase i u projektnoj strukturi označene su nazivom \textit{healthy}. Ove oznake treba tumačiti u okviru konkretnog zadatka detekcije masa: naziv \textit{healthy} označava odsustvo anotirane mase, a ne nužno potpunu kliničku potvrdu odsustva svih mogućih promena.
 	
