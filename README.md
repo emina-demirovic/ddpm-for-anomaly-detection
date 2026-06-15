@@ -229,8 +229,7 @@ For the initial mini-evaluation, the following values were obtained:
 | ----------------------------- | -----: |
 | Sample-wise average precision | 0.8802 |
 | Sample-wise AUROC             | 0.7143 |
-| Pixel-wise average precision  | 0.0040 |
-| Optimal DICE over thresholds  | 0.0102 |
+| Optimal DICE over thresholds  | 0.5102 |
 
 These results should be interpreted carefully. They show that the pipeline is functional and that reconstruction differences can provide an initial anomaly signal. They do not demonstrate a fully optimized lesion localization model.
 
