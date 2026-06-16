@@ -7,6 +7,7 @@ dataset/
 datasets/
 dataset_raw/
 
+results/initial_eval/visualizations/
 checkpoints/
 experiments/
 outputs/
