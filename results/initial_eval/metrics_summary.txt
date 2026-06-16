@@ -7,8 +7,7 @@ Validation timesteps: 5
 Sample-wise average precision: 0.8802
 Sample-wise AUROC: 0.7143
 
-Pixel-wise average precision: 0.0040
-Optimal DICE score over all thresholds: 0.0102
+Optimal DICE score over all thresholds: 0.2102
 
 Note:
 This is an initial sanity evaluation, not a final full-scale experiment.

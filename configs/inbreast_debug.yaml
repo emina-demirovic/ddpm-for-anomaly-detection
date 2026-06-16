@@ -7,7 +7,6 @@ dataset:
   image_channels: 1
   center: true
   normal_split: 0.8
-  anomal_split: 0.99
 
 dataloader:
   num_workers: 2
@@ -55,7 +54,6 @@ model:
 diffusion:
   prediction_type: epsilon
   noise_offset: 0.1
-  input_perturbation: 0.0
   validation_timesteps: 5
   validation_guidance: 0.0
 
@@ -90,7 +88,6 @@ optimizer:
   learning_rate: 1e-4
   scale_lr: false
   lr_scheduler: constant
-  lr_warmup_steps: 500
   adam_beta1: 0.9
   adam_beta2: 0.999
   adam_weight_decay: 1e-2
