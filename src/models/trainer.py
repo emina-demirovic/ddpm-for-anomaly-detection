@@ -568,8 +568,6 @@ def validation_loss(
             # The clean image is the desired output; its synthetic corruption is
             # the condition that teaches restoration of healthy anatomy.
             condition = corrupt_healthy_batch(clean, config, data_cfg.center)
-            with autocast_context(device, use_amp):
-                loss = diffusion_loss(model, scheduler, clean, condition, config)
             losses.append(float(loss.cpu()))
     model.train()
     return float(np.mean(losses)) if losses else math.nan
