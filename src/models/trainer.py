@@ -404,8 +404,6 @@ def diffusion_loss(
         return F.mse_loss(prediction.float(), target.float())
 
     snr = compute_snr(scheduler, timesteps)
-    if scheduler.config.prediction_type == "v_prediction":
-        snr += 1
     weights = torch.minimum(snr, torch.full_like(snr, float(gamma))) / snr
     loss = F.mse_loss(prediction.float(), target.float(), reduction="none")
     return (loss.mean((1, 2, 3)) * weights).mean()
